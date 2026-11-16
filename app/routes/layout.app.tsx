@@ -1,4 +1,15 @@
-import { Outlet } from "react-router";
+import { Outlet, useLocation, useSearchParams } from "react-router";
+import { useEffect, useState } from "react";
+import { PrototypeSwitcher } from "~/components/prototype-switcher";
+import {
+  INBOX_VARIANTS,
+  InboxPrototypeControls,
+  useInboxPrototype,
+  VariantA_Header,
+  VariantB_NavItem,
+  VariantC_NavItem,
+  VariantC_Page,
+} from "~/components/inbox-prototype";
 import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
 import { DevUI } from "~/components/dev-ui";
@@ -227,16 +238,45 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     isTeamAdmin: userIsTeamAdmin,
   } = loaderData;
 
+  // PROTOTYPE (ticket #6): Inbox variants, switch with ?variant=A|B|C
+  const [searchParams] = useSearchParams();
+  const variant = searchParams.get("variant") ?? "A";
+  const inbox = useInboxPrototype(currentUser?.role ?? null, userIsTeamAdmin);
+  const [inboxPageOpen, setInboxPageOpen] = useState(false);
+  const location = useLocation();
+  useEffect(() => setInboxPageOpen(false), [location.pathname, variant]);
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         currentUser={currentUser}
         recentCourses={recentCourses}
         isTeamAdmin={userIsTeamAdmin}
+        headerSlot={
+          currentUser && variant === "A" ? <VariantA_Header inbox={inbox} /> : null
+        }
+        navTopSlot={
+          !currentUser ? null : variant === "B" ? (
+            <VariantB_NavItem inbox={inbox} />
+          ) : variant === "C" ? (
+            <VariantC_NavItem
+              inbox={inbox}
+              open={inboxPageOpen}
+              onOpen={() => setInboxPageOpen(true)}
+            />
+          ) : null
+        }
       />
       <main className="flex-1 overflow-y-auto">
-        <Outlet />
+        {variant === "C" && inboxPageOpen ? (
+          <VariantC_Page inbox={inbox} onClose={() => setInboxPageOpen(false)} />
+        ) : (
+          <Outlet />
+        )}
       </main>
+      <PrototypeSwitcher variants={INBOX_VARIANTS}>
+        <InboxPrototypeControls inbox={inbox} />
+      </PrototypeSwitcher>
       <DevUI
         users={users}
         currentUser={currentUser}

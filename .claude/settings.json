@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "deny": [
+      "Artifact",
+      "AskUserQuestion",
+      "ReportFindings",
+      "ScheduleWakeup",
+      "SendFeedback",
+      "Workflow"
+    ]
+  },
+  "disableClaudeAiConnectors": true,
+  "disableWorkflows": true,
+  "disableBundledSkills": true,
+  "disableArtifact": true
+}

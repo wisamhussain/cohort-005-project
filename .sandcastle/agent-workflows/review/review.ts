@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import * as sandcastle from "@ai-hero/sandcastle";
 import { noSandbox } from "@ai-hero/sandcastle/sandboxes/no-sandbox";
@@ -19,6 +20,9 @@ const result = await runWithExtraction({
   agent: claudeAgent(),
   sandbox: noSandbox(),
   logging: { type: "stdout" },
+  // The default is 600. A review that sits silent for five minutes has hung,
+  // and failing sooner leaves the workflow time to push its commits.
+  idleTimeoutSeconds: 300,
   promptFile: path.join(import.meta.dirname, "prompt.md"),
   promptArgs: {
     PR_NUMBER: required("PR_NUMBER"),
@@ -35,11 +39,33 @@ const git = (...args: string[]): string =>
 // The diff after the agent's commits: the comments land on that.
 const hunks = diffLines(git("diff", `origin/${BASE_REF}...HEAD`));
 const { comments: found }: z.infer<typeof reviewSchema> = result.output;
-const comments = found.filter(({ path: file, line }) => {
-  if (hunks.get(file)?.has(line)) return true;
-  console.error(`Dropping the comment on ${file}:${line}: not in the diff.`);
-  return false;
-});
+// GitHub rejects the whole review for one comment outside the diff, so those
+// findings go into the verdict instead. Each left finding has one home.
+const comments: typeof found = [];
+const offDiff: typeof found = [];
+for (const comment of found) {
+  if (hunks.get(comment.path)?.has(comment.line)) comments.push(comment);
+  else offDiff.push(comment);
+}
+
+const VERDICT = "/tmp/review-verdict.md";
+if (fs.existsSync(VERDICT)) {
+  const left = [
+    "",
+    "## Left",
+    "",
+    comments.length === 0
+      ? "No findings left on the diff's lines."
+      : `${comments.length} finding(s) left as inline comments on their lines.`,
+    ...offDiff.flatMap(({ path: file, line, body }) => [
+      "",
+      `**\`${file}:${line}\`** (outside the diff):`,
+      "",
+      body,
+    ]),
+  ];
+  fs.appendFileSync(VERDICT, `${left.join("\n")}\n`);
+}
 
 // The request body for POST /repos/{owner}/{repo}/pulls/{n}/reviews.
 writeJson("review-comments.json", {

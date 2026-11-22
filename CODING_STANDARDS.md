@@ -32,9 +32,10 @@ Once a module owns a feature's data, the route asks the module for it and
 does not import `~/db` or `drizzle-orm` itself. The instructor analytics
 route gets everything from `instructorAnalytics`. A query in the loader
 splits the feature's rules across two files, and the module's tests stop
-covering what the page shows. `npm run lint:boundaries` enforces this for the
-instructor analytics route only; apply it to every other module by hand. See
-[app/modules/README.md](./app/modules/README.md).
+covering what the page shows. `npm run lint:boundaries` enforces this for
+every route except the ones listed in `ROUTES_THAT_QUERY_THE_DB` in
+`.dependency-cruiser.cjs`, which predate the rule; apply it to those by hand.
+See [app/modules/README.md](./app/modules/README.md).
 
 ## Arrange tests through the module under test
 
@@ -106,6 +107,34 @@ const [count, setCount] = useState(rows.length);
 const [items, setItems] = useState(rows);
 const count = items.length;
 ```
+
+## Key per-entity state by the entity
+
+A component that holds state seeded from a prop, and is rendered once per
+lesson, course or user, gets `key={entity.id}`. Without the key, React keeps
+the component when the entity changes, and the state outlives it. The lesson
+note kept lesson 18's draft on lesson 19, marked "Unsaved changes", ready to
+be saved into the wrong note.
+
+## The client checks input with the server's own rules
+
+A client-side check (a counter, a disabled button, an inline error) calls the
+same function or schema the server uses, normalisation included. Two copies of
+a rule drift: the note counter measured untrimmed text while the save trimmed
+first, so Save was disabled on notes the server would accept.
+
+## Move code in its own commit
+
+A file split or a move goes in a commit that changes nothing else. Then the
+reviewer can check that the move is verbatim from the commit alone, and read
+the behaviour change on its own.
+
+## Moved code is in scope, but it does not decide the verdict
+
+A breach that existed before the change, and that the change only moved, is
+reported as a finding and left unfixed unless the fix is small and in scope.
+It does not fail the Standards axis. The verdict judges the code the change
+wrote.
 
 ## A comment explains why
 

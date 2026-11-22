@@ -163,6 +163,14 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Install agent-browser
+        # The review checks UI changes in a real browser
+        # (docs/agents/agent-browser.md). Installed here so the agent does not
+        # spend its turns downloading a browser.
+        run: |
+          npm install -g agent-browser
+          agent-browser install
+
       - name: Migrate and seed the database
         # The pre-commit hook runs on every commit the agent makes, and the
         # repo's checks need a database.
@@ -184,6 +192,7 @@ jobs:
           fi
 
       - name: Review the pull request
+        id: review
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           OUTPUT_DIR: ${{ runner.temp }}
@@ -191,6 +200,10 @@ jobs:
 
       - name: Push the review's fixes
         id: push
+        # Runs when the review fails or is cancelled too. Every commit went
+        # through the pre-commit hook, so each one stands on its own, and a
+        # run that hangs after its last commit would otherwise lose them all.
+        if: always() && steps.review.outcome != 'skipped'
         env:
           GH_TOKEN: ${{ secrets.FACTORY_PAT }}
         run: |
@@ -225,7 +238,7 @@ jobs:
 
       - name: Open a pull request for the rejected push
         id: fallback
-        if: steps.push.outputs.fallback == 'true'
+        if: always() && steps.push.outputs.fallback == 'true'
         env:
           GH_TOKEN: ${{ secrets.FACTORY_PAT }}
         run: |
@@ -252,11 +265,24 @@ jobs:
           GH_TOKEN: ${{ secrets.FACTORY_PAT }}
           FALLBACK: ${{ steps.push.outputs.fallback }}
           FALLBACK_URL: ${{ steps.fallback.outputs.url }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
         run: |
           set -euo pipefail
           [ -s /tmp/review-verdict.md ] || \
             echo "The review run produced no verdict. See the logs. Re-add \`agent:review\` to retry." \
               > /tmp/review-verdict.md
+          if [ "$REVIEW_OUTCOME" != "success" ] && grep -q '## Standards:' /tmp/review-verdict.md; then
+            # The agent wrote a verdict but its run did not finish: the
+            # commits it cites may not all be pushed, and no inline comments
+            # are posted.
+            {
+              echo "> [!WARNING]"
+              echo "> The review run ended with \`$REVIEW_OUTCOME\` after writing this verdict. Its inline comments were not posted, and only the commits that are on the branch were pushed. Re-add \`agent:review\` to retry."
+              echo ""
+              cat /tmp/review-verdict.md
+            } > /tmp/review-verdict.tmp
+            mv /tmp/review-verdict.tmp /tmp/review-verdict.md
+          fi
           if [ "$FALLBACK" = "true" ]; then
             {
               echo ""
@@ -277,6 +303,18 @@ jobs:
           attach=()
           for png in /tmp/evidence/*.png; do attach+=(--attach "$png"); done
           gh pr comment "$PR_NUMBER" --body-file /tmp/review-verdict.md "${attach[@]}"
+
+      - name: Publish the rules the review wanted
+        # For the retro, not the PR: they go to the run's summary page.
+        if: always()
+        run: |
+          if [ -s /tmp/review-rules-wanted.md ]; then
+            {
+              echo "## Rules this review wanted and could not find"
+              echo ""
+              cat /tmp/review-rules-wanted.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Post the inline comments
         # One review, event COMMENT, with a comment on each line the agent

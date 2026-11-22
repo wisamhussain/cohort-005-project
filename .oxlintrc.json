@@ -89,6 +89,25 @@
     "sql/no-dynamic-raw": "error"
   },
   "overrides": [
+    // Components sit below routes. A component types its own props, and the
+    // route passes its loader data in. Type-only imports count: this is why
+    // the rule lives here and not in dependency-cruiser, which skips them.
+    {
+      "files": ["app/components/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/routes/**", "~/routes/**"],
+                "message": "Components do not import routes or their +types. Type the props in the component, and let the route pass its data in."
+              }
+            ]
+          }
+        ]
+      }
+    },
     {
       "files": [
         "app/routes/**",

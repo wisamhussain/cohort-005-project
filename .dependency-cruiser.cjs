@@ -23,6 +23,42 @@ const R = PACKAGES_ROOT;
  */
 const PACKAGE_INTERNALS = `^${R}/[^/]+/[^/]+/`;
 
+/**
+ * Routes that queried the database before the routes-no-db rule. This list
+ * only shrinks.
+ */
+const ROUTES_THAT_QUERY_THE_DB = [
+  "^app/routes/admin\\.categories\\.tsx$",
+  "^app/routes/admin\\.courses\\.tsx$",
+  "^app/routes/admin\\.refunds\\.tsx$",
+  "^app/routes/admin\\.users\\.tsx$",
+  "^app/routes/api\\.video-tracking\\.ts$",
+  "^app/routes/courses\\.\\$slug\\.\\$moduleId\\.tsx$",
+  "^app/routes/courses\\.\\$slug\\.lessons\\.\\$lessonId\\.tsx$",
+  "^app/routes/courses\\.\\$slug\\.purchase\\.tsx$",
+  "^app/routes/courses\\.\\$slug\\.refund\\.ts$",
+  "^app/routes/courses\\.\\$slug\\.tsx$",
+  "^app/routes/courses\\.\\$slug\\.welcome\\.tsx$",
+  "^app/routes/courses\\.tsx$",
+  "^app/routes/dashboard\\.tsx$",
+  "^app/routes/home\\.tsx$",
+  "^app/routes/instructor\\.\\$courseId\\.lessons\\.\\$lessonId\\.quiz\\.tsx$",
+  "^app/routes/instructor\\.\\$courseId\\.lessons\\.\\$lessonId\\.tsx$",
+  "^app/routes/instructor\\.\\$courseId\\.modules\\.\\$moduleId\\.tsx$",
+  "^app/routes/instructor\\.\\$courseId\\.students\\.tsx$",
+  "^app/routes/instructor\\.\\$courseId\\.tsx$",
+  "^app/routes/instructor\\.new\\.tsx$",
+  "^app/routes/instructor\\.questions\\.tsx$",
+  "^app/routes/instructor\\.tsx$",
+  "^app/routes/layout\\.app\\.tsx$",
+  "^app/routes/login\\.tsx$",
+  "^app/routes/redeem\\.\\$code\\.tsx$",
+  "^app/routes/saved\\.tsx$",
+  "^app/routes/settings\\.tsx$",
+  "^app/routes/signup\\.tsx$",
+  "^app/routes/team\\.tsx$",
+];
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
@@ -87,11 +123,11 @@ module.exports = {
     // },
 
     {
-      name: "instructor-analytics-route-no-db",
+      name: "routes-no-db",
       comment:
-        "The instructor analytics route gets its data from the instructor-analytics module, never by querying the database itself.",
+        "A route asks a module for its data and does not query the database itself (CODING_STANDARDS.md: A route does not query data a module owns). The routes in ROUTES_THAT_QUERY_THE_DB predate this rule: take a route off the list when it stops querying, and never add one.",
       severity: "error",
-      from: { path: "^app/routes/instructor\\.analytics\\.tsx$" },
+      from: { path: "^app/routes/", pathNot: ROUTES_THAT_QUERY_THE_DB },
       to: { path: ["^app/db/", "^node_modules/(drizzle-orm|better-sqlite3)/"] },
     },
     {
@@ -103,6 +139,22 @@ module.exports = {
       to: {
         path: ["^app/db/index\\.ts$", "^node_modules/better-sqlite3/"],
       },
+    },
+    {
+      name: "module-lib-no-db-connection",
+      comment:
+        "A module's lib/ takes the database as an argument; only its entry points import the connection and pass it in. Then its tests can hand lib/ a createTestDb() instead.",
+      severity: "error",
+      from: { path: `^${R}/[^/]+/lib/` },
+      to: { path: "^app/db/index\\.ts$" },
+    },
+    {
+      name: "modules-no-components",
+      comment:
+        "Modules sit below the UI: a component may import a module, never the reverse. Define a shared type in the module and let the component import it.",
+      severity: "error",
+      from: { path: `^${R}/` },
+      to: { path: "^app/components/" },
     },
   ],
   options: {

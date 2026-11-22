@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useFetcher, useNavigate } from "react-router";
-import { LessonNote } from "~/components/lesson-note";
+import { LessonNote } from "./lesson-note";
 import { CommentThread } from "~/components/comment-thread";
 import { LessonProgressStatus } from "~/db/schema";
 import { Button } from "~/components/ui/button";

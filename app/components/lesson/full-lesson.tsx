@@ -135,8 +135,9 @@ export function FullLesson({
             />
           )}
 
-          {/* Note — under the video, so the Student can write while they watch */}
-          {currentUserId && <LessonNote note={note} />}
+          {/* Note — under the video, so the Student can write while they watch.
+              Keyed by Lesson so Previous/Next does not carry the draft over. */}
+          {currentUserId && <LessonNote key={lesson.id} note={note} />}
 
           {/* Lesson Content */}
           {contentHtml && (

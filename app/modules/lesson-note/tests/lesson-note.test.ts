@@ -9,7 +9,6 @@ describe("describeNoteDraft", () => {
       length: 0,
       max: MAX_NOTE_LENGTH,
       tooLong: false,
-      empty: true,
       unsaved: false,
       canSave: false,
     });
@@ -17,7 +16,7 @@ describe("describeNoteDraft", () => {
 
   it("treats whitespace as empty", () => {
     const draft = describeNoteDraft("   \n ", null);
-    expect(draft.empty).toBe(true);
+    expect(draft.length).toBe(0);
     expect(draft.canSave).toBe(false);
   });
 
@@ -55,6 +54,13 @@ describe("describeNoteDraft", () => {
     expect(draft.length).toBe(MAX_NOTE_LENGTH + 1);
     expect(draft.tooLong).toBe(true);
     expect(draft.canSave).toBe(false);
+  });
+
+  it("counts only the text the save keeps, not surrounding whitespace", () => {
+    const draft = describeNoteDraft(`  ${"a".repeat(MAX_NOTE_LENGTH)}\n`, null);
+    expect(draft.length).toBe(MAX_NOTE_LENGTH);
+    expect(draft.tooLong).toBe(false);
+    expect(draft.canSave).toBe(true);
   });
 
   it("marks clearing a saved Note as unsaved but not saveable", () => {
